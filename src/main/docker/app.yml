@@ -1,0 +1,28 @@
+version: '2'
+services:
+    indexer-app:
+        image: indexer
+        environment:
+            - _JAVA_OPTIONS=-Xmx512m -Xms256m
+            - SPRING_PROFILES_ACTIVE=prod,swagger
+            - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://admin:$${coolybot.registry.password}@coolybot-registry:8761/eureka
+            - SPRING_CLOUD_CONFIG_URI=http://admin:$${coolybot.registry.password}@coolybot-registry:8761/config
+            - SPRING_DATA_MONGODB_URI=mongodb://indexer-mongodb:27017
+            - SPRING_DATA_MONGODB_DATABASE=indexer
+            - COOLYBOT_SLEEP=30 # gives time for the Coolybot Registry to boot before the application
+            - SPRING_DATA_JEST_URI=http://indexer-elasticsearch:9200
+    indexer-mongodb:
+        extends:
+            file: mongodb.yml
+            service: indexer-mongodb
+    indexer-elasticsearch:
+        extends:
+            file: elasticsearch.yml
+            service: indexer-elasticsearch
+    coolybot-registry:
+        extends:
+            file: coolybot-registry.yml
+            service: coolybot-registry
+        environment:
+            - SPRING_CLOUD_CONFIG_SERVER_COMPOSITE_0_TYPE=native
+            - SPRING_CLOUD_CONFIG_SERVER_COMPOSITE_0_SEARCH_LOCATIONS=file:./central-config/docker-config/
