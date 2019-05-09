@@ -7,6 +7,7 @@ import io.cooly.crawler.config.SecurityBeanOverrideConfiguration;
 import io.cooly.crawler.domain.DataFeed;
 import io.cooly.crawler.repository.DataFeedRepository;
 import io.cooly.crawler.repository.search.DataFeedSearchRepository;
+import io.cooly.crawler.service.DataFeedService;
 import io.cooly.crawler.web.rest.errors.ExceptionTranslator;
 
 import org.junit.Before;
@@ -15,6 +16,8 @@ import org.junit.runner.RunWith;
 import org.mockito.MockitoAnnotations;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
@@ -79,6 +82,9 @@ public class DataFeedResourceIntTest {
     @Autowired
     private DataFeedRepository dataFeedRepository;
 
+    @Autowired
+    private DataFeedService dataFeedService;
+
     /**
      * This repository is mocked in the io.cooly.crawler.repository.search test package.
      *
@@ -106,7 +112,7 @@ public class DataFeedResourceIntTest {
     @Before
     public void setup() {
         MockitoAnnotations.initMocks(this);
-        final DataFeedResource dataFeedResource = new DataFeedResource(dataFeedRepository, mockDataFeedSearchRepository);
+        final DataFeedResource dataFeedResource = new DataFeedResource(dataFeedService);
         this.restDataFeedMockMvc = MockMvcBuilders.standaloneSetup(dataFeedResource)
             .setCustomArgumentResolvers(pageableArgumentResolver)
             .setControllerAdvice(exceptionTranslator)
@@ -246,7 +252,9 @@ public class DataFeedResourceIntTest {
     @Test
     public void updateDataFeed() throws Exception {
         // Initialize the database
-        dataFeedRepository.save(dataFeed);
+        dataFeedService.save(dataFeed);
+        // As the test used the service layer, reset the Elasticsearch mock repository
+        reset(mockDataFeedSearchRepository);
 
         int databaseSizeBeforeUpdate = dataFeedRepository.findAll().size();
 
@@ -311,7 +319,7 @@ public class DataFeedResourceIntTest {
     @Test
     public void deleteDataFeed() throws Exception {
         // Initialize the database
-        dataFeedRepository.save(dataFeed);
+        dataFeedService.save(dataFeed);
 
         int databaseSizeBeforeDelete = dataFeedRepository.findAll().size();
 
@@ -331,9 +339,9 @@ public class DataFeedResourceIntTest {
     @Test
     public void searchDataFeed() throws Exception {
         // Initialize the database
-        dataFeedRepository.save(dataFeed);
-        when(mockDataFeedSearchRepository.search(queryStringQuery("id:" + dataFeed.getId())))
-            .thenReturn(Collections.singletonList(dataFeed));
+        dataFeedService.save(dataFeed);
+        when(mockDataFeedSearchRepository.search(queryStringQuery("id:" + dataFeed.getId()), PageRequest.of(0, 20)))
+            .thenReturn(new PageImpl<>(Collections.singletonList(dataFeed), PageRequest.of(0, 1), 1));
         // Search the dataFeed
         restDataFeedMockMvc.perform(get("/api/_search/data-feeds?query=id:" + dataFeed.getId()))
             .andExpect(status().isOk())
